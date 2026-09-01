@@ -106,7 +106,7 @@
                 <h3 style="margin:0;">Daftar Channel & Akun</h3>
                 <div>
                     <button class="btn btn-primary" onclick="bukaModalTambah()">+ Tambah Channel</button>
-                    <button class="btn btn-danger" onclick="resetSemuaData()" style="font-size:11px; padding:8px 10px;">Reset Data</button>
+                    <button class="btn btn-warning" onclick="bukaModalEditDariAtas()" style="font-size:13px; padding:8px 12px;">✏️ Edit</button>
                 </div>
             </div>
 
@@ -123,6 +123,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th width="30">Pilih</th>
                             <th>No</th>
                             <th>Nama Channel</th>
                             <th>Subscribers</th>
@@ -258,14 +259,6 @@
         renderTable();
     }
 
-    function resetSemuaData() {
-        if(confirm('Hapus seluruh daftar channel tersimpan untuk memulai ulang dari bersih?')) {
-            localStorage.removeItem('rolana_channels');
-            appData.channels = [];
-            muatDataLokal();
-        }
-    }
-
     function updateStats() {
         const total = appData.channels.length;
         const monet = appData.channels.filter(c => c.monet === 'Ya').length;
@@ -297,7 +290,7 @@
         });
 
         if(filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel" di atas.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel" di atas.</td></tr>`;
             return;
         }
 
@@ -309,6 +302,7 @@
 
             let tr = document.createElement('tr');
             tr.innerHTML = `
+                <td><input type="radio" name="pilihChannel" value="${c.id}"></td>
                 <td>${index + 1}</td>
                 <td><b>${c.name || 'Channel'}</b></td>
                 <td>${Number(c.subs || 0).toLocaleString()}</td>
@@ -321,7 +315,6 @@
                 <td>${c.niche || '-'}</td>
                 <td><span class="badge-monet">${c.monet === 'Ya' ? '💲' : '🔒'}</span></td>
                 <td>
-                    <button class="btn btn-warning" style="padding:4px 8px; font-size:11px;" onclick="bukaModalEdit('${c.id}')">Edit</button>
                     <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="hapusChannel('${c.id}')">Hapus</button>
                 </td>
             `;
@@ -331,6 +324,15 @@
 
     function bukaModalTambah() { document.getElementById('addModal').style.display = 'flex'; }
     function tutupModalTambah() { document.getElementById('addModal').style.display = 'none'; }
+
+    // Fungsi tombol Edit di atas tabel
+    function bukaModalEditDariAtas() {
+        const selected = document.querySelector('input[name="pilihChannel"]:checked');
+        if(!selected) {
+            return alert('Silakan pilih (klik lingkaran) salah satu channel pada tabel terlebih dahulu!');
+        }
+        bukaModalEdit(selected.value);
+    }
 
     function bukaModalEdit(id) {
         const chan = appData.channels.find(c => c.id === id);
@@ -352,7 +354,7 @@
             chan.trend = Number(document.getElementById('editTrend').value);
             simpanKeLokal();
             tutupModalEdit();
-            alert('Data berhasil diperbarui sesuai YouTube Studio!');
+            alert('Data berhasil diperbarui!');
         }
     }
 
@@ -383,7 +385,6 @@
 
         try {
             let url = '';
-            // Deteksi apakah input berupa ID (UC...) atau handle (@...)
             if(inputVal.startsWith('UC')) {
                 url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${inputVal}&key=${API_KEY}`;
             } else {
@@ -398,7 +399,6 @@
                 const info = data.items[0];
                 const realId = info.id;
                 
-                // Cek duplikat
                 if(appData.channels.some(c => c.id === realId)) {
                     return alert('Channel ini sudah ada di dalam daftar!');
                 }
