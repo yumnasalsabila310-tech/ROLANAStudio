@@ -1,0 +1,11 @@
+{
+  "channels": [
+    {
+      "id": "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+      "name": "Contoh Channel",
+      "history": [
+        { "date": "2026-09-01", "subs": 1000, "views": 50000 }
+      ]
+    }
+  ]
+}
