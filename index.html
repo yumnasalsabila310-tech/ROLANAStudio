@@ -54,11 +54,12 @@
 </head>
 <body>
 
-    <!-- HALAMAN LOGIN -->
+    <!-- HALAMAN LOGIN DENGAN USERNAME & PASSWORD -->
     <div id="loginPage" class="login-container">
         <h2>ROLANAStudio</h2>
-        <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Silakan masukkan kata sandi untuk masuk</p>
-        <input type="password" id="passwordInput" placeholder="Password (bebas, cth: 1234)">
+        <p style="color:var(--text-muted); font-size:14px; margin-bottom:20px;">Silakan login untuk masuk</p>
+        <input type="text" id="usernameInput" placeholder="Username (cth: admin)">
+        <input type="password" id="passwordInput" placeholder="Password (cth: 1234)">
         <button onclick="login()">Masuk ke Brangkas-YT</button>
     </div>
 
@@ -70,9 +71,7 @@
                 <div id="userInfo" style="font-size:12px; color:var(--text-muted);"></div>
             </div>
             <div class="nav-actions">
-                <button class="btn">Tutorial</button>
-                <button class="btn">Cari Channel YT</button>
-                <button class="btn btn-primary" onclick="syncData()">Sync Stats</button>
+                <button class="btn btn-primary" onclick="syncDataYouTube()">Sync Stats</button>
                 <button class="btn btn-danger" onclick="logout()">Keluar</button>
             </div>
         </div>
@@ -105,9 +104,6 @@
                     <option value="">SEMUA MONETISASI</option>
                     <option value="Ya">Sudah Monet</option>
                     <option value="Belum">Belum Monet</option>
-                </select>
-                <select id="filterPengelola" onchange="renderTable()">
-                    <option value="">SEMUA PENGELOLA</option>
                 </select>
             </div>
 
@@ -155,37 +151,54 @@
     </div>
 
 <script>
+    // MASUKKAN API KEY ANDA DI SINI AGAR BISA TARIK DATA OTOMATIS
+    const API_KEY = 'AIzaSyBOZsO5hY44mIIlOSRpj6lOuaqqjirMeOk';
+
     let appData = { channels: [] };
 
-    function login() {
-        const pass = document.getElementById('passwordInput').value;
-        if(pass) {
+    // Cek apakah sudah pernah login sebelumnya di browser ini
+    window.onload = function() {
+        if(localStorage.getItem('rolana_logged_in') === 'true') {
             document.getElementById('loginPage').style.display = 'none';
             document.getElementById('appPage').style.display = 'block';
-            document.getElementById('userInfo').innerText = `Terhubung • ${newtoLocaleString ? '' : new Date().toLocaleDateString()}`;
-            loadData();
+            muatDataLokal();
+        }
+    };
+
+    function login() {
+        const user = document.getElementById('usernameInput').value.trim();
+        const pass = document.getElementById('passwordInput').value.trim();
+        
+        // Anda bisa ubah username & password bebas di sini
+        if(user === 'admin' && pass === '1234') {
+            localStorage.setItem('rolana_logged_in', 'true');
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('appPage').style.display = 'block';
+            muatDataLokal();
         } else {
-            alert('Masukkan password terlebih dahulu!');
+            alert('Username atau Password salah! (Coba user: admin, pass: 1234)');
         }
     }
 
     function logout() {
+        localStorage.removeItem('rolana_logged_in');
         document.getElementById('appPage').style.display = 'none';
         document.getElementById('loginPage').style.display = 'block';
     }
 
-    async function loadData() {
-        try {
-            const res = await fetch('data.json?t=' + new Date().getTime());
-            if(res.ok) {
-                appData = await res.json();
-            }
-        } catch(e) {
-            console.log('Belum ada file data.json, menggunakan data lokal.');
+    function muatDataLokal() {
+        let saved = localStorage.getItem('rolana_channels');
+        if(saved) {
+            appData.channels = JSON.parse(saved);
         }
         updateStats();
         renderTable();
-        isiFilterPengelola();
+    }
+
+    function simpanKeLokal() {
+        localStorage.setItem('rolana_channels', JSON.stringify(appData.channels));
+        updateStats();
+        renderTable();
     }
 
     function updateStats() {
@@ -204,13 +217,11 @@
         
         const search = document.getElementById('searchInput').value.toLowerCase();
         const fMonet = document.getElementById('filterMonet').value;
-        const fPengelola = document.getElementById('filterPengelola').value;
 
         let filtered = appData.channels.filter(c => {
             const matchSearch = (c.name || '').toLowerCase().includes(search) || c.id.toLowerCase().includes(search);
             const matchMonet = fMonet === "" || c.monet === fMonet;
-            const matchPengelola = fPengelola === "" || c.pengelola === fPengelola;
-            return matchSearch && matchMonet && matchPengelola;
+            return matchSearch && matchMonet;
         });
 
         if(filtered.length === 0) {
@@ -222,7 +233,7 @@
             let tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${index + 1}</td>
-                <td><b>${c.name || 'Memuat...'}</b></td>
+                <td><b>${c.name || 'Channel'}</b></td>
                 <td><a href="https://www.youtube.com/channel/${c.id}" target="_blank" style="color:var(--primary);">Buka ↗</a></td>
                 <td>${Number(c.subs || 0).toLocaleString()}</td>
                 <td>${Number(c.views || 0).toLocaleString()}</td>
@@ -239,15 +250,6 @@
         });
     }
 
-    function isiFilterPengelola() {
-        const select = document.getElementById('filterPengelola');
-        let pengelolaSet = [...new Set(appData.channels.map(c => c.pengelola).filter(Boolean))];
-        select.innerHTML = '<option value="">SEMUA PENGELOLA</option>';
-        pengelolaSet.forEach(p => {
-            select.innerHTML += `<option value="${p}">${p}</option>`;
-        });
-    }
-
     function bukaModalTambah() { document.getElementById('addModal').style.display = 'flex'; }
     function tutupModalTambah() { document.getElementById('addModal').style.display = 'none'; }
 
@@ -259,37 +261,63 @@
 
         if(!id) return alert('Masukkan Channel ID!');
 
-        // Ambil data awal dari YouTube via Client-side fetch
-        const API_KEY = 'MASUKKAN_API_KEY_ANDA_DI_SINI'; // Nanti diambil otomatis atau manual
-        appData.channels.push({
-            id: id,
-            name: 'Channel ' + appData.channels.length,
-            subs: 0,
-            views: 0,
-            videos: 0,
-            pengelola: pengelola,
-            niche: niche,
-            monet: monet,
-            history: []
-        });
+        // Ambil data langsung dari YouTube API
+        try {
+            const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${id}&key=${API_KEY}`;
+            const res = await fetch(url);
+            const data = await res.json();
 
-        tutupModalTambah();
-        renderTable();
-        updateStats();
-        alert('Channel berhasil ditambahkan! Untuk menyimpan secara permanen di GitHub, pastikan skrip aksi harian berjalan atau perbarui file data.json.');
+            if(data.items && data.items.length > 0) {
+                const info = data.items[0];
+                appData.channels.push({
+                    id: id,
+                    name: info.snippet.title,
+                    subs: info.statistics.subscriberCount || 0,
+                    views: info.statistics.viewCount || 0,
+                    videos: info.statistics.videoCount || 0,
+                    pengelola: pengelola,
+                    niche: niche,
+                    monet: monet
+                });
+                simpanKeLokal();
+                tutupModalTambah();
+                document.getElementById('inputChannelId').value = '';
+                document.getElementById('inputPengelola').value = '';
+                document.getElementById('inputNiche').value = '';
+            } else {
+                alert('Channel tidak ditemukan di YouTube. Periksa kembali ID Anda.');
+            }
+        } catch(e) {
+            alert('Gagal mengambil data dari YouTube.');
+        }
     }
 
     function hapusChannel(id) {
         if(confirm('Hapus channel dari daftar?')) {
             appData.channels = appData.channels.filter(c => c.id !== id);
-            renderTable();
-            updateStats();
+            simpanKeLokal();
         }
     }
 
-    function syncData() {
-        alert('Fitur Sync Stats berjalan otomatis setiap hari via GitHub Actions, atau Anda bisa memperbarui data langsung dari server!');
-        loadData();
+    async function syncDataYouTube() {
+        alert('Memperbarui statistik terbaru dari YouTube...');
+        for(let c of appData.channels) {
+            try {
+                const url = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${c.id}&key=${API_KEY}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if(data.items && data.items.length > 0) {
+                    const stats = data.items[0].statistics;
+                    c.subs = stats.subscriberCount || c.subs;
+                    c.views = stats.viewCount || c.views;
+                    c.videos = stats.videoCount || c.videos;
+                }
+            } catch(e) {
+                console.log('Gagal sync channel:', c.id);
+            }
+        }
+        simpanKeLokal();
+        alert('Data berhasil diperbarui!');
     }
 </script>
 
