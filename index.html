@@ -23,7 +23,7 @@
         .login-container h2 { margin-bottom: 10px; color: var(--primary); }
         .btn-google { background: #ea4335; color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; font-size: 14px; }
         
-        .app-container { display: none; max-width: 1350px; margin: auto; }
+        .app-container { display: none; max-width: 1400px; margin: auto; }
         .header { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 15px 25px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
         .brand h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
         .brand span { font-size: 12px; color: var(--text-muted); font-weight: normal; }
@@ -34,18 +34,18 @@
         .btn-danger { background: var(--danger); border: none; color: white; }
         .btn-warning { background: var(--warning); border: none; color: black; font-weight: bold; }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
         .stat-card { background: var(--card-bg); padding: 20px; border-radius: 10px; border: 1px solid var(--border-color); }
-        .stat-card h3 { margin: 0 0 10px 0; font-size: 14px; color: var(--text-muted); }
-        .stat-card .val { font-size: 24px; font-weight: bold; }
+        .stat-card h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--text-muted); }
+        .stat-card .val { font-size: 22px; font-weight: bold; }
 
         .content-box { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); }
         .table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-        th, td { padding: 12px 10px; border-bottom: 1px solid var(--border-color); }
-        th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
-        .badge-active { background: rgba(34, 197, 94, 0.2); color: var(--success); padding: 4px 10px; border-radius: 12px; font-size: 11px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+        th, td { padding: 12px 8px; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-muted); font-weight: 600; font-size: 10px; text-transform: uppercase; }
+        .badge-active { background: rgba(34, 197, 94, 0.2); color: var(--success); padding: 4px 8px; border-radius: 10px; font-size: 10px; }
 
         .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
         .modal-content { background: var(--card-bg); padding: 25px; border-radius: 12px; width: 400px; border: 1px solid var(--border-color); }
@@ -68,7 +68,7 @@
     <div id="appPage" class="app-container">
         <div class="header">
             <div class="brand">
-                <h1>🔒 Brangkas-YT <span>ROLANAStudio (Analytics & Revenue)</span></h1>
+                <h1>🔒 Brangkas-YT <span>ROLANAStudio</span></h1>
             </div>
             <div class="nav-actions">
                 <button class="btn btn-primary" onclick="syncDataOAuth()">🔄 Sync Analytics & Revenue</button>
@@ -90,6 +90,10 @@
                 <div class="val" id="totalRealtime">0</div>
             </div>
             <div class="stat-card">
+                <h3>Stok Video</h3>
+                <div class="val" id="totalVideos">0 Video</div>
+            </div>
+            <div class="stat-card">
                 <h3>Estimasi Pendapatan</h3>
                 <div class="val" id="totalRevenue" style="color: var(--success);">$0.00</div>
             </div>
@@ -109,15 +113,16 @@
                             <th>Subscribers</th>
                             <th>Realtime Views</th>
                             <th>Jam Tonton</th>
+                            <th>Stok Video</th>
+                            <th>Upload Terakhir</th>
                             <th>Estimasi Pendapatan</th>
                             <th>Pengelola</th>
                             <th>Niche</th>
-                            <th>Status</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
-                        <tr><td colspan="10" style="text-align:center; color:var(--text-muted);">Belum ada channel. Silakan tambah channel Anda.</td></tr>
+                        <tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Memuat data channel...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -191,7 +196,7 @@
     }
 
     function muatDataLokal() {
-        let saved = localStorage.getItem('rolana_oauth_channels');
+        let saved = localStorage.getItem('rolana_oauth_channels_v2');
         if(saved) {
             appData.channels = JSON.parse(saved);
         }
@@ -200,7 +205,7 @@
     }
 
     function simpanKeLokal() {
-        localStorage.setItem('rolana_oauth_channels', JSON.stringify(appData.channels));
+        localStorage.setItem('rolana_oauth_channels_v2', JSON.stringify(appData.channels));
         renderTable();
         updateStatsSummary();
     }
@@ -209,18 +214,21 @@
         let totalSubs = 0;
         let totalWatch = 0;
         let totalReal = 0;
+        let totalVid = 0;
         let totalRev = 0;
 
         appData.channels.forEach(c => {
             totalSubs += Number(c.subs || 0);
             totalWatch += Number(c.watchTime || 0);
             totalReal += Number(c.realtimeViews || 0);
+            totalVid += Number(c.videoCount || 0);
             totalRev += Number(c.revenue || 0);
         });
 
         document.getElementById('totalSubs').innerText = totalSubs.toLocaleString();
         document.getElementById('totalWatchTime').innerText = totalWatch.toLocaleString() + ' Jam';
         document.getElementById('totalRealtime').innerText = totalReal.toLocaleString();
+        document.getElementById('totalVideos').innerText = totalVid.toLocaleString() + ' Video';
         document.getElementById('totalRevenue').innerText = '$' + totalRev.toFixed(2);
     }
 
@@ -229,7 +237,7 @@
         tbody.innerHTML = '';
 
         if(appData.channels.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel" di atas.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel" di atas.</td></tr>`;
             return;
         }
 
@@ -241,10 +249,11 @@
                 <td>${Number(c.subs || 0).toLocaleString()}</td>
                 <td><span style="color:var(--primary); font-weight:bold;">${Number(c.realtimeViews || 0).toLocaleString()} views</span></td>
                 <td>${Number(c.watchTime || 0).toLocaleString()} Jam</td>
+                <td><b>${Number(c.videoCount || 0).toLocaleString()}</b></td>
+                <td style="font-size:11px; color:var(--text-muted);">${c.lastUpload || '-'}</td>
                 <td><span style="color:var(--success); font-weight:bold;">$${Number(c.revenue || 0).toFixed(2)}</span></td>
                 <td>${c.pengelola || '-'}</td>
                 <td>${c.niche || '-'}</td>
-                <td><span class="badge-active">Terhubung</span></td>
                 <td>
                     <button class="btn btn-warning" style="padding:4px 8px; font-size:11px;" onclick="bukaModalEdit(${index})">Edit</button>
                     <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="hapusChannel(${index})">Hapus</button>
@@ -277,27 +286,13 @@
         document.getElementById('channelModal').style.display = 'none';
     }
 
-    async function simpanChannelData() {
+    function simpanChannelData() {
         const id = document.getElementById('inputChannelId').value.trim();
         const pengelola = document.getElementById('inputPengelola').value.trim();
         const niche = document.getElementById('inputNiche').value.trim();
         const editIdx = parseInt(document.getElementById('editIndex').value);
 
         if(!id) return alert('Masukkan Channel ID!');
-
-        let channelName = 'Channel YouTube';
-        let subs = 0;
-
-        // Ambil nama dari API jika token ada
-        let token = localStorage.getItem('google_access_token');
-        if(token) {
-            try {
-                const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${id}&key=YOUR_API_KEY`, {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                // Fallback jika tidak pakai key, ambil via mine atau data publik
-            } catch(e) {}
-        }
 
         if(editIdx >= 0) {
             appData.channels[editIdx].id = id;
@@ -306,10 +301,12 @@
         } else {
             appData.channels.push({
                 id: id,
-                name: 'Channel ' + (appData.channels.length + 1),
+                name: 'Channel Baru',
                 subs: 0,
                 realtimeViews: 0,
                 watchTime: 0,
+                videoCount: 0,
+                lastUpload: '-',
                 revenue: 0,
                 pengelola: pengelola,
                 niche: niche
@@ -333,11 +330,11 @@
             return handleAuthClick();
         }
 
-        alert('Menyelaraskan data Analytics & Pendapatan resmi...');
+        alert('Menyelaraskan data Analytics, Stok Video, dan Pendapatan...');
         
         try {
-            // Ambil data dasar channel akun utama
-            const channelRes = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true', {
+            // 1. Ambil data statistik dasar & playlist unggahan (uploads) channel utama
+            const channelRes = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true', {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
             const channelData = await channelRes.json();
@@ -347,8 +344,24 @@
                 const mainId = info.id;
                 const mainName = info.snippet.title;
                 const mainSubs = Number(info.statistics.subscriberCount || 0);
+                const videoCount = Number(info.statistics.videoCount || 0);
+                const uploadsPlaylistId = info.contentDetails.relatedPlaylists.uploads;
 
-                // Ambil Analytics (Views, Watch Time, Revenue) 30 hari terakhir
+                // 2. Ambil video terakhir dari playlist uploads untuk mengetahui jadwal upload terakhir
+                let lastUploadDate = '-';
+                try {
+                    const playlistRes = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=1`, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    const playlistData = await playlistRes.json();
+                    if(playlistData.items && playlistData.items.length > 0) {
+                        const publishedAt = playlistData.items[0].snippet.publishedAt;
+                        let dateObj = new Date(publishedAt);
+                        lastUploadDate = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                    }
+                } catch(e) {}
+
+                // 3. Ambil Data Analytics (Views, Watch Time, Revenue) 30 hari terakhir
                 const today = new Date().toISOString().split('T')[0];
                 const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 
@@ -376,6 +389,8 @@
                     found.subs = mainSubs;
                     found.realtimeViews = views30;
                     found.watchTime = watchHours;
+                    found.videoCount = videoCount;
+                    found.lastUpload = lastUploadDate;
                     found.revenue = rev;
                 } else if(appData.channels.length === 0) {
                     appData.channels.push({
@@ -384,13 +399,15 @@
                         subs: mainSubs,
                         realtimeViews: views30,
                         watchTime: watchHours,
+                        videoCount: videoCount,
+                        lastUpload: lastUploadDate,
                         revenue: rev,
                         pengelola: 'Utama',
                         niche: 'Umum'
                     });
                 }
                 simpanKeLokal();
-                alert('Data berhasil disinkronkan secara akurat!');
+                alert('Data Stok Video, Jadwal Upload, & Analytics berhasil diperbarui!');
             }
         } catch(e) {
             console.error(e);
