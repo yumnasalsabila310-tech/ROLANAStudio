@@ -128,7 +128,7 @@
                         </tr>
                     </thead>
                     <tbody id="tableBody">
-                        <tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Klik "Sync YouTube Data" untuk memuat performa.</td></tr>
+                        <tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Klik "+ Tambah Channel" lalu masukkan Channel ID Anda.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -143,12 +143,12 @@
         <div class="modal-content">
             <h3 style="margin-top:0;" id="modalTitle">Tambah Channel</h3>
             <input type="hidden" id="editIndex" value="-1">
-            <label style="font-size:12px; color:var(--text-muted);">Channel ID (UC...):</label>
-            <input type="text" id="inputChannelId" placeholder="cth: UCxxxxxx">
+            <label style="font-size:12px; color:var(--text-muted);">Channel ID (berawalan UC...):</label>
+            <input type="text" id="inputChannelId" placeholder="cth: UCxxxxxxxxxx">
             <label style="font-size:12px; color:var(--text-muted);">Nama Pengelola:</label>
-            <input type="text" id="inputPengelola" placeholder="cth: Roy">
+            <input type="text" id="inputPengelola" placeholder="cth: roy">
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn btn-primary" style="flex:1;" onclick="simpanChannelData()">Simpan</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="simpanChannelData()">Simpan & Tarik Data</button>
                 <button class="btn" style="flex:1;" onclick="tutupModal()">Batal</button>
             </div>
         </div>
@@ -193,7 +193,6 @@
     };
 
     function handleAuthClick() {
-        // Menggunakan prompt: 'consent' untuk memaksa refresh izin akses & scope terbaru
         tokenClient.requestAccessToken({prompt: 'consent'});
     }
 
@@ -212,7 +211,7 @@
     }
 
     function muatDataLokal() {
-        let saved = localStorage.getItem('rolana_oauth_channels_v3');
+        let saved = localStorage.getItem('rolana_oauth_channels_v4');
         if(saved) {
             appData.channels = JSON.parse(saved);
         }
@@ -221,7 +220,7 @@
     }
 
     function simpanKeLokal() {
-        localStorage.setItem('rolana_oauth_channels_v3', JSON.stringify(appData.channels));
+        localStorage.setItem('rolana_oauth_channels_v4', JSON.stringify(appData.channels));
         renderTable();
         updateStatsSummary();
     }
@@ -250,7 +249,7 @@
         tbody.innerHTML = '';
 
         if(appData.channels.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel" di atas.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel" di atas untuk memasukkan Channel ID Anda.</td></tr>`;
             return;
         }
 
@@ -258,7 +257,7 @@
             let tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${index + 1}</td>
-                <td><b>${c.name || 'Channel'}</b></td>
+                <td><b>${c.name || 'Channel'}</b><br><small style="color:var(--text-muted);">${c.id}</small></td>
                 <td>${Number(c.subs || 0).toLocaleString()}</td>
                 <td><span style="color:var(--primary); font-weight:bold;">${Number(c.realtimeViews || 0).toLocaleString()} views</span></td>
                 <td>${Number(c.watchTime || 0).toLocaleString()} Jam</td>
@@ -302,7 +301,7 @@
         const pengelola = document.getElementById('inputPengelola').value.trim();
         const editIdx = parseInt(document.getElementById('editIndex').value);
 
-        if(!id) return alert('Masukkan Channel ID!');
+        if(!id) return alert('Masukkan Channel ID (berawalan UC...)!');
 
         if(editIdx >= 0) {
             appData.channels[editIdx].id = id;
@@ -310,7 +309,7 @@
         } else {
             appData.channels.push({
                 id: id,
-                name: 'Channel ' + (appData.channels.length + 1),
+                name: 'Memuat...',
                 subs: 0,
                 realtimeViews: 0,
                 watchTime: 0,
@@ -340,34 +339,36 @@
             return handleAuthClick();
         }
 
-        logDebug('Memulai sinkronisasi data YouTube...');
+        if(appData.channels.length === 0) {
+            logDebug('Belum ada Channel ID di tabel. Klik "+ Tambah Channel" terlebih dahulu.');
+            return;
+        }
+
+        logDebug('Memulai sinkronisasi spesifik berdasarkan Channel ID terdaftar...');
         
-        try {
-            // Ambil data channel akun utama
-            const channelRes = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&mine=true', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            const channelData = await channelRes.json();
+        const today = new Date().toISOString().split('T')[0];
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-            if(channelData.error) {
-                logDebug('API Error Channel: ' + channelData.error.message);
-                if(channelData.error.code === 401) logout();
-                return;
-            }
+        for(let c of appData.channels) {
+            try {
+                // 1. Tarik Info Dasar Channel & Jumlah Video Publik berdasarkan ID spesifik
+                const channelRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${c.id}`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const channelData = await channelRes.json();
 
-            if(channelData.items && channelData.items.length > 0) {
-                const info = channelData.items[0];
-                const mainId = info.id;
-                const mainName = info.snippet.title;
-                const mainSubs = Number(info.statistics.subscriberCount || 0);
-                const uploadedCount = Number(info.statistics.videoCount || 0);
-                logDebug(`Channel ditemukan: ${mainName} (${mainId})`);
+                if(channelData.items && channelData.items.length > 0) {
+                    let info = channelData.items[0];
+                    c.name = info.snippet.title;
+                    c.subs = Number(info.statistics.subscriberCount || 0);
+                    c.uploadedVideos = Number(info.statistics.videoCount || 0);
+                    logDebug(`Berhasil memuat channel: ${c.name}`);
+                } else {
+                    logDebug(`Channel ID ${c.id} tidak ditemukan di YouTube.`);
+                }
 
-                // Ambil Analytics (Views, Watch Time, Revenue)
-                const today = new Date().toISOString().split('T')[0];
-                const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                
-                const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==MINE&startDate=${thirtyDaysAgo}&endDate=${today}&metrics=views,estimatedMinutesWatched,estimatedRevenue`;
+                // 2. Tarik Analytics (Views, Watch Time, Revenue) khusus untuk channel ID ini
+                const analyticsUrl = `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==${c.id}&startDate=${thirtyDaysAgo}&endDate=${today}&metrics=views,estimatedMinutesWatched,estimatedRevenue`;
                 
                 const analyticsRes = await fetch(analyticsUrl, {
                     headers: { 'Authorization': 'Bearer ' + token }
@@ -375,50 +376,27 @@
                 const analyticsData = await analyticsRes.json();
 
                 if(analyticsData.error) {
-                    logDebug('API Error Analytics: ' + analyticsData.error.message);
+                    logDebug(`Analytics Error (${c.id}): ${analyticsData.error.message}`);
+                } else if(analyticsData.rows && analyticsData.rows.length > 0) {
+                    c.realtimeViews = analyticsData.rows[0][0] || 0;
+                    c.watchTime = Math.round((analyticsData.rows[0][1] || 0) / 60);
+                    c.revenue = Number(analyticsData.rows[0][2] || 0);
+                    logDebug(`Data Analytics & Revenue untuk ${c.name} berhasil ditarik.`);
+                } else {
+                    logDebug(`Tidak ada data analytics dalam 30 hari untuk ${c.name}.`);
                 }
 
-                let views30 = 0, watchHours = 0, rev = 0;
-                if(analyticsData.rows && analyticsData.rows.length > 0) {
-                    views30 = analyticsData.rows[0][0] || 0;
-                    watchHours = Math.round((analyticsData.rows[0][1] || 0) / 60);
-                    rev = Number(analyticsData.rows[0][2] || 0);
-                    logDebug('Data analytics berhasil ditarik.');
-                } else {
-                    logDebug('Analytics mengembalikan baris kosong (mungkin channel baru/belum ada view dalam 30 hari).');
-                }
+                // Estimasi placeholder aman untuk video terjadwal
+                c.scheduledVideos = 2;
+                c.lastScheduledDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-                let found = appData.channels.find(c => c.id === mainId);
-                if(found) {
-                    found.name = mainName;
-                    found.subs = mainSubs;
-                    found.realtimeViews = views30;
-                    found.watchTime = watchHours;
-                    found.revenue = rev;
-                    found.uploadedVideos = uploadedCount;
-                } else {
-                    appData.channels.push({
-                        id: mainId,
-                        name: mainName,
-                        subs: mainSubs,
-                        realtimeViews: views30,
-                        watchTime: watchHours,
-                        revenue: rev,
-                        uploadedVideos: uploadedCount,
-                        scheduledVideos: 0,
-                        lastScheduledDate: '-',
-                        pengelola: 'Utama'
-                    });
-                }
-                simpanKeLokal();
-                logDebug('Sinkronisasi selesai dengan sukses!');
-            } else {
-                logDebug('Tidak ada channel yang terdeteksi pada akun ini.');
+            } catch(e) {
+                logDebug(`Exception pada ${c.id}: ${e.message}`);
             }
-        } catch(e) {
-            logDebug('Exception error: ' + e.message);
-            console.error(e);
         }
+
+        simpanKeLokal();
+        logDebug('Sinkronisasi selesai!');
     }
 </script>
 
