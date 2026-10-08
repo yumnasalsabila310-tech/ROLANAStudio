@@ -55,7 +55,6 @@
 </head>
 <body>
 
-    <!-- HALAMAN LOGIN GOOGLE OAUTH -->
     <div id="loginPage" class="login-container">
         <h2>ROLANAStudio</h2>
         <p style="color:var(--text-muted); font-size:13px; margin-bottom:20px;">Hubungkan akun Google Anda untuk mengelola performa channel.</p>
@@ -65,14 +64,13 @@
         </button>
     </div>
 
-    <!-- HALAMAN UTAMA -->
     <div id="appPage" class="app-container">
         <div class="header">
             <div class="brand">
                 <h1>🔒 Brangkas-YT <span>ROLANAStudio</span></h1>
             </div>
             <div class="nav-actions">
-                <button class="btn btn-primary" onclick="syncDataOAuth()">🔄 Sync Subs & Views</button>
+                <button class="btn btn-primary" onclick="syncDataOAuth()">🔄 Sync Subs & Views Otomatis</button>
                 <button class="btn btn-danger" onclick="logout()">Keluar</button>
             </div>
         </div>
@@ -87,12 +85,12 @@
                 <div class="val" id="totalViews" style="color: var(--primary);">0 Views</div>
             </div>
             <div class="stat-card">
-                <h3>Video Publik (Upload)</h3>
-                <div class="val" id="totalUploaded">0</div>
+                <h3>Estimasi Jam Tayang</h3>
+                <div class="val" id="totalWatchTime" style="color: var(--warning);">0 Jam</div>
             </div>
             <div class="stat-card">
                 <h3>Video Terjadwal</h3>
-                <div class="val" id="totalScheduled" style="color: var(--warning);">0</div>
+                <div class="val" id="totalScheduled" style="color: #f43f5e;">0</div>
             </div>
         </div>
 
@@ -109,7 +107,7 @@
                             <th>Nama Channel</th>
                             <th>Subscribers</th>
                             <th>Total Views</th>
-                            <th>Video Publik</th>
+                            <th>Estimasi Jam Tayang</th>
                             <th>Video Terjadwal</th>
                             <th>Jadwal Terakhir</th>
                             <th>Aksi</th>
@@ -125,7 +123,6 @@
         </div>
     </div>
 
-    <!-- MODAL TAMBAH CHANNEL -->
     <div id="channelModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-top:0; color:var(--primary);">Tambah Channel</h3>
@@ -138,12 +135,14 @@
         </div>
     </div>
 
-    <!-- MODAL EDIT JADWAL -->
     <div id="editModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0; color:var(--primary);">Edit Jadwal Video</h3>
-            <p style="font-size:12px; color:var(--text-muted);">Subscriber & Total Views ditarik otomatis dari YouTube.</p>
+            <h3 style="margin-top:0; color:var(--primary);">Edit Detail Channel</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Subs & Total Views otomatis dari YouTube.</p>
             <input type="hidden" id="editIndex" value="-1">
+
+            <label style="font-size:12px; color:var(--text-muted);">Kustom Jam Tayang (Opsional / Akurat Studio):</label>
+            <input type="number" id="editWatchTime" placeholder="cth: 3200">
 
             <label style="font-size:12px; color:var(--text-muted);">Jumlah Video Terjadwal:</label>
             <input type="number" id="editScheduled" placeholder="cth: 2">
@@ -209,13 +208,13 @@
     function logout() {
         localStorage.removeItem('google_logged_in');
         localStorage.removeItem('google_access_token');
-        localStorage.removeItem('rolana_oauth_channels_v12');
+        localStorage.removeItem('rolana_oauth_channels_v13');
         document.getElementById('appPage').style.display = 'none';
         document.getElementById('loginPage').style.display = 'block';
     }
 
     function muatDataLokal() {
-        let saved = localStorage.getItem('rolana_oauth_channels_v12');
+        let saved = localStorage.getItem('rolana_oauth_channels_v13');
         if(saved) {
             appData.channels = JSON.parse(saved);
         }
@@ -224,23 +223,27 @@
     }
 
     function simpanKeLokal() {
-        localStorage.setItem('rolana_oauth_channels_v12', JSON.stringify(appData.channels));
+        localStorage.setItem('rolana_oauth_channels_v13', JSON.stringify(appData.channels));
         renderTable();
         updateStatsSummary();
     }
 
     function updateStatsSummary() {
-        let totalSubs = 0, totalViews = 0, totalUp = 0, totalSch = 0;
+        let totalSubs = 0, totalViews = 0, totalWatch = 0, totalSch = 0;
         appData.channels.forEach(c => {
             totalSubs += Number(c.subs || 0);
             totalViews += Number(c.totalViews || 0);
-            totalUp += Number(c.uploadedVideos || 0);
+            
+            // Jika jam tayang kustom diisi, gunakan itu. Jika tidak, estimasi otomatis dari views (asumsi rata-rata durasi tonton 3 menit = 0.05 jam per view)
+            let watchTime = c.customWatchTime !== undefined && c.customWatchTime !== '' ? Number(c.customWatchTime) : Math.round(Number(c.totalViews || 0) * 0.05);
+            totalWatch += watchTime;
+            
             totalSch += Number(c.scheduledVideos || 0);
         });
 
         document.getElementById('totalSubs').innerText = totalSubs.toLocaleString();
         document.getElementById('totalViews').innerText = totalViews.toLocaleString() + ' Views';
-        document.getElementById('totalUploaded').innerText = totalUp.toLocaleString();
+        document.getElementById('totalWatchTime').innerText = totalWatch.toLocaleString() + ' Jam';
         document.getElementById('totalScheduled').innerText = totalSch.toLocaleString();
     }
 
@@ -254,14 +257,16 @@
         }
 
         appData.channels.forEach((c, index) => {
+            let watchTimeDisplay = c.customWatchTime !== undefined && c.customWatchTime !== '' ? Number(c.customWatchTime) : Math.round(Number(c.totalViews || 0) * 0.05);
+            
             let tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${index + 1}</td>
                 <td><b>${c.name || 'Channel'}</b><br><small style="color:var(--text-muted);">${c.id}</small></td>
                 <td><span style="color:var(--success); font-weight:bold;">${Number(c.subs || 0).toLocaleString()}</span></td>
                 <td><span style="color:var(--primary); font-weight:bold;">${Number(c.totalViews || 0).toLocaleString()} views</span></td>
-                <td>${Number(c.uploadedVideos || 0).toLocaleString()} Video</td>
-                <td><span style="color:var(--warning); font-weight:bold;">${Number(c.scheduledVideos || 0)} Video</span></td>
+                <td><span style="color:var(--warning); font-weight:bold;">${watchTimeDisplay.toLocaleString()} Jam</span></td>
+                <td><span style="color:#f43f5e; font-weight:bold;">${Number(c.scheduledVideos || 0)} Video</span></td>
                 <td><b>${c.lastScheduledDate || '-'}</b></td>
                 <td>
                     <button class="btn btn-warning" style="padding:4px 8px; font-size:11px;" onclick="bukaModalEdit(${index})">Edit</button>
@@ -280,6 +285,7 @@
     function bukaModalEdit(index) {
         const c = appData.channels[index];
         document.getElementById('editIndex').value = index;
+        document.getElementById('editWatchTime').value = c.customWatchTime || '';
         document.getElementById('editScheduled').value = c.scheduledVideos || 0;
         document.getElementById('editLastDate').value = c.lastScheduledDate !== '-' ? c.lastScheduledDate : '';
         document.getElementById('editModal').style.display = 'flex';
@@ -293,9 +299,8 @@
         const id = document.getElementById('inputChannelId').value.trim();
         if(!id) return alert('Masukkan Channel ID (berawalan UC...)!');
 
-        // Cek apakah channel sudah ada
         if(appData.channels.some(c => c.id === id)) {
-            return alert('Channel ID ini sudah ada di daftar.');
+            return alert('Channel ID ini sudah terdaftar.');
         }
 
         appData.channels.push({
@@ -303,7 +308,7 @@
             name: 'Memuat...',
             subs: 0,
             totalViews: 0,
-            uploadedVideos: 0,
+            customWatchTime: '',
             scheduledVideos: 0,
             lastScheduledDate: '-'
         });
@@ -315,16 +320,17 @@
     function simpanEditManual() {
         const idx = parseInt(document.getElementById('editIndex').value);
         if(idx >= 0) {
+            appData.channels[idx].customWatchTime = document.getElementById('editWatchTime').value;
             appData.channels[idx].scheduledVideos = Number(document.getElementById('editScheduled').value);
             appData.channels[idx].lastScheduledDate = document.getElementById('editLastDate').value || '-';
             simpanKeLokal();
             tutupModal('editModal');
-            alert('Jadwal video berhasil diperbarui!');
+            alert('Perubahan berhasil disimpan!');
         }
     }
 
     function hapusChannel(index) {
-        if(confirm('Hapus channel ini dari daftar?')) {
+        if(confirm('Hapus channel ini?')) {
             appData.channels.splice(index, 1);
             simpanKeLokal();
         }
@@ -335,11 +341,11 @@
         if(!token) return handleAuthClick();
 
         if(appData.channels.length === 0) {
-            logDebug('Belum ada Channel ID. Klik "+ Tambah Channel" untuk mendaftarkan channel Anda.');
+            logDebug('Belum ada Channel ID. Klik "+ Tambah Channel".');
             return;
         }
 
-        logDebug('Menarik data Subs & Total Views terbaru berdasarkan Channel ID...');
+        logDebug('Menarik data Subs & Total Views otomatis dari YouTube...');
 
         for(let c of appData.channels) {
             try {
@@ -353,7 +359,6 @@
                     c.name = info.snippet.title;
                     c.subs = Number(info.statistics.subscriberCount || 0);
                     c.totalViews = Number(info.statistics.viewCount || 0);
-                    c.uploadedVideos = Number(info.statistics.videoCount || 0);
                     logDebug(`Berhasil update ${c.name}: ${c.subs} Subs, ${c.totalViews} Views`);
                 } else {
                     logDebug(`Channel ID ${c.id} tidak ditemukan.`);
