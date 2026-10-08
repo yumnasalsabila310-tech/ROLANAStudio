@@ -45,7 +45,6 @@
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         th, td { padding: 12px 10px; border-bottom: 1px solid var(--border-color); }
         th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
-        .badge-active { background: rgba(34, 197, 94, 0.2); color: var(--success); padding: 4px 10px; border-radius: 12px; font-size: 11px; }
 
         .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
         .modal-content { background: var(--card-bg); padding: 25px; border-radius: 12px; width: 420px; border: 1px solid var(--border-color); max-height: 90vh; overflow-y: auto; }
@@ -59,7 +58,7 @@
     <!-- HALAMAN LOGIN GOOGLE OAUTH -->
     <div id="loginPage" class="login-container">
         <h2>ROLANAStudio</h2>
-        <p style="color:var(--text-muted); font-size:13px; margin-bottom:20px;">Hubungkan akun Google untuk sinkronisasi otomatis Subscribers & Video.</p>
+        <p style="color:var(--text-muted); font-size:13px; margin-bottom:20px;">Hubungkan akun Google untuk sinkronisasi otomatis channel Anda.</p>
         <button class="btn-google" onclick="handleAuthClick()">
             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35 11.1h-9.17v2.73h5.51c-.24 1.38-1.04 2.53-2.22 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09 0-.75-.07-1.48-.19-2.12z"/><path fill="currentColor" d="M12.18 21.5c3.08 0 5.67-1.02 7.56-2.77l-3.57-2.77c-1.02.69-2.33 1.1-3.99 1.1-3.08 0-5.69-2.08-6.62-4.88H1.84v2.86C3.72 18.99 7.64 21.5 12.18 21.5z"/><path fill="currentColor" d="M5.56 12.18c-.24-.69-.38-1.43-.38-2.18s.14-1.49.38-2.18V4.96H1.84C1.07 6.49.65 8.19.65 10s.42 3.51 1.19 5.04l3.72-2.86z"/><path fill="currentColor" d="M12.18 5.62c1.67 0 3.16.58 4.34 1.71l3.25-3.25C17.85 2.38 15.26 1.35 12.18 1.35 7.64 1.35 3.72 3.86 1.84 7.52l3.72 2.86c.93-2.8 3.54-4.76 6.62-4.76z"/></svg>
             Masuk dengan Akun Google
@@ -73,7 +72,7 @@
                 <h1>🔒 Brangkas-YT <span>ROLANAStudio</span></h1>
             </div>
             <div class="nav-actions">
-                <button class="btn btn-primary" onclick="syncDataOAuth()">🔄 Sync YouTube Data</button>
+                <button class="btn btn-primary" onclick="syncDataOAuth()">🔄 Sync YouTube Otomatis</button>
                 <button class="btn btn-danger" onclick="logout()">Keluar</button>
             </div>
         </div>
@@ -84,20 +83,12 @@
                 <div class="val" id="totalSubs">0</div>
             </div>
             <div class="stat-card">
-                <h3>Jam Tonton</h3>
-                <div class="val" id="totalWatchTime">0 Jam</div>
-            </div>
-            <div class="stat-card">
-                <h3>Realtime (28 Hari)</h3>
-                <div class="val" id="totalRealtime">0</div>
-            </div>
-            <div class="stat-card">
-                <h3>Pendapatan</h3>
-                <div class="val" id="totalRevenue" style="color: var(--success);">$0.00</div>
+                <h3>Total Ditonton (Views)</h3>
+                <div class="val" id="totalViews" style="color: var(--primary);">0 Views</div>
             </div>
             <div class="stat-card">
                 <h3>Video Publik (Upload)</h3>
-                <div class="val" id="totalUploaded" style="color: var(--primary);">0</div>
+                <div class="val" id="totalUploaded">0</div>
             </div>
             <div class="stat-card">
                 <h3>Video Terjadwal</h3>
@@ -108,7 +99,7 @@
         <div class="content-box">
             <div class="table-toolbar">
                 <h3 style="margin:0;">Daftar Channel & Performa Terhubung</h3>
-                <button class="btn btn-primary" onclick="bukaModalTambah()">+ Tambah Channel</button>
+                <button class="btn btn-primary" onclick="syncDataOAuth()">+ Deteksi Channel Otomatis</button>
             </div>
             <div style="overflow-x: auto;">
                 <table>
@@ -117,9 +108,7 @@
                             <th>No</th>
                             <th>Nama Channel</th>
                             <th>Subscribers</th>
-                            <th>Realtime Views</th>
-                            <th>Jam Tonton</th>
-                            <th>Pendapatan</th>
+                            <th>Total Ditonton (Views)</th>
                             <th>Video Publik</th>
                             <th>Video Terjadwal</th>
                             <th>Jadwal Terakhir</th>
@@ -128,7 +117,7 @@
                         </tr>
                     </thead>
                     <tbody id="tableBody">
-                        <tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel".</td></tr>
+                        <tr><td colspan="9" style="text-align:center; color:var(--text-muted);">Memuat data channel...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -137,45 +126,24 @@
         </div>
     </div>
 
-    <!-- MODAL TAMBAH CHANNEL -->
-    <div id="channelModal" class="modal">
-        <div class="modal-content">
-            <h3 style="margin-top:0;">Tambah Channel</h3>
-            <label style="font-size:12px; color:var(--text-muted);">Channel ID (UC...):</label>
-            <input type="text" id="inputChannelId" placeholder="cth: UCxxxxxxxxxx">
-            <label style="font-size:12px; color:var(--text-muted);">Nama Pengelola:</label>
-            <input type="text" id="inputPengelola" placeholder="cth: roy">
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn btn-primary" style="flex:1;" onclick="simpanChannelBaru()">Simpan & Ambil Data</button>
-                <button class="btn" style="flex:1;" onclick="tutupModal('channelModal')">Batal</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL EDIT STATISTIK STUDIO -->
+    <!-- MODAL EDIT STATISTIK -->
     <div id="editModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0; color:var(--primary);">Edit Data Studio (Analisis)</h3>
-            <p style="font-size:12px; color:var(--text-muted);">Masukkan angka persis dari YouTube Studio Anda.</p>
+            <h3 style="margin-top:0; color:var(--primary);">Edit Data Performa Channel</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Sesuaikan data privat (Views, Terjadwal, Tanggal) dengan YouTube Studio.</p>
             <input type="hidden" id="editIndex" value="-1">
 
-            <label style="font-size:12px; color:var(--text-muted);">Realtime Views (28 Hari / Sesuai Studio):</label>
-            <input type="number" id="editRealtime" placeholder="cth: 38800">
+            <label style="font-size:12px; color:var(--text-muted);">Total Ditonton (Total Views):</label>
+            <input type="number" id="editViews" placeholder="cth: 38800">
 
-            <label style="font-size:12px; color:var(--text-muted);">Jam Tonton (Watch Time):</label>
-            <input type="number" id="editWatchTime" placeholder="cth: 3200">
-
-            <label style="font-size:12px; color:var(--text-muted);">Pendapatan ($):</label>
-            <input type="number" step="0.01" id="editRevenue" placeholder="cth: 0.00">
-
-            <label style="font-size:12px; color:var(--text-muted);">Video Terjadwal:</label>
+            <label style="font-size:12px; color:var(--text-muted);">Jumlah Video Terjadwal:</label>
             <input type="number" id="editScheduled" placeholder="cth: 2">
 
-            <label style="font-size:12px; color:var(--text-muted);">Tanggal Jadwal Terakhir:</label>
+            <label style="font-size:12px; color:var(--text-muted);">Tanggal Jadwal Video Terakhir:</label>
             <input type="date" id="editLastDate">
 
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn btn-primary" style="flex:1;" onclick="simpanEditManual()">Simpan Data</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="simpanEditManual()">Simpan Perubahan</button>
                 <button class="btn" style="flex:1;" onclick="tutupModal('editModal')">Batal</button>
             </div>
         </div>
@@ -214,6 +182,7 @@
         if(localStorage.getItem('google_logged_in') === 'true' && localStorage.getItem('google_access_token')) {
             tampilkanDashboard();
             muatDataLokal();
+            syncDataOAuth();
         }
     };
 
@@ -225,7 +194,6 @@
         localStorage.setItem('google_logged_in', 'true');
         document.getElementById('loginPage').style.display = 'none';
         document.getElementById('appPage').style.display = 'block';
-        muatDataLokal();
     }
 
     function logout() {
@@ -236,7 +204,7 @@
     }
 
     function muatDataLokal() {
-        let saved = localStorage.getItem('rolana_oauth_channels_v5');
+        let saved = localStorage.getItem('rolana_oauth_channels_v7');
         if(saved) {
             appData.channels = JSON.parse(saved);
         }
@@ -245,153 +213,4 @@
     }
 
     function simpanKeLokal() {
-        localStorage.setItem('rolana_oauth_channels_v5', JSON.stringify(appData.channels));
-        renderTable();
-        updateStatsSummary();
-    }
-
-    function updateStatsSummary() {
-        let totalSubs = 0, totalWatch = 0, totalReal = 0, totalRev = 0, totalUp = 0, totalSch = 0;
-        appData.channels.forEach(c => {
-            totalSubs += Number(c.subs || 0);
-            totalWatch += Number(c.watchTime || 0);
-            totalReal += Number(c.realtimeViews || 0);
-            totalRev += Number(c.revenue || 0);
-            totalUp += Number(c.uploadedVideos || 0);
-            totalSch += Number(c.scheduledVideos || 0);
-        });
-
-        document.getElementById('totalSubs').innerText = totalSubs.toLocaleString();
-        document.getElementById('totalWatchTime').innerText = totalWatch.toLocaleString() + ' Jam';
-        document.getElementById('totalRealtime').innerText = totalReal.toLocaleString();
-        document.getElementById('totalRevenue').innerText = '$' + totalRev.toFixed(2);
-        document.getElementById('totalUploaded').innerText = totalUp.toLocaleString();
-        document.getElementById('totalScheduled').innerText = totalSch.toLocaleString();
-    }
-
-    function renderTable() {
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '';
-
-        if(appData.channels.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel".</td></tr>`;
-            return;
-        }
-
-        appData.channels.forEach((c, index) => {
-            let tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${index + 1}</td>
-                <td><b>${c.name || 'Channel'}</b><br><small style="color:var(--text-muted);">${c.id}</small></td>
-                <td>${Number(c.subs || 0).toLocaleString()}</td>
-                <td><span style="color:var(--primary); font-weight:bold;">${Number(c.realtimeViews || 0).toLocaleString()} views</span></td>
-                <td>${Number(c.watchTime || 0).toLocaleString()} Jam</td>
-                <td><span style="color:var(--success); font-weight:bold;">$${Number(c.revenue || 0).toFixed(2)}</span></td>
-                <td>${Number(c.uploadedVideos || 0).toLocaleString()} Video</td>
-                <td><span style="color:var(--warning); font-weight:bold;">${Number(c.scheduledVideos || 0)} Video</span></td>
-                <td>${c.lastScheduledDate || '-'}</td>
-                <td>${c.pengelola || '-'}</td>
-                <td>
-                    <button class="btn btn-warning" style="padding:4px 8px; font-size:11px;" onclick="bukaModalEdit(${index})">Edit</button>
-                    <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="hapusChannel(${index})">Hapus</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function bukaModalTambah() {
-        document.getElementById('inputChannelId').value = '';
-        document.getElementById('inputPengelola').value = '';
-        document.getElementById('channelModal').style.display = 'flex';
-    }
-
-    function bukaModalEdit(index) {
-        const c = appData.channels[index];
-        document.getElementById('editIndex').value = index;
-        document.getElementById('editRealtime').value = c.realtimeViews || 0;
-        document.getElementById('editWatchTime').value = c.watchTime || 0;
-        document.getElementById('editRevenue').value = c.revenue || 0;
-        document.getElementById('editScheduled').value = c.scheduledVideos || 0;
-        document.getElementById('editLastDate').value = c.lastScheduledDate !== '-' ? c.lastScheduledDate : '';
-        document.getElementById('editModal').style.display = 'flex';
-    }
-
-    function tutupModal(modalId) {
-        document.getElementById(modalId).style.display = 'none';
-    }
-
-    async function simpanChannelBaru() {
-        const id = document.getElementById('inputChannelId').value.trim();
-        const pengelola = document.getElementById('inputPengelola').value.trim();
-        if(!id) return alert('Masukkan Channel ID!');
-
-        appData.channels.push({
-            id: id,
-            name: 'Memuat...',
-            subs: 0,
-            realtimeViews: 0,
-            watchTime: 0,
-            revenue: 0,
-            uploadedVideos: 0,
-            scheduledVideos: 0,
-            lastScheduledDate: '-',
-            pengelola: pengelola
-        });
-        simpanKeLokal();
-        tutupModal('channelModal');
-        syncDataOAuth();
-    }
-
-    function simpanEditManual() {
-        const idx = parseInt(document.getElementById('editIndex').value);
-        if(idx >= 0) {
-            appData.channels[idx].realtimeViews = Number(document.getElementById('editRealtime').value);
-            appData.channels[idx].watchTime = Number(document.getElementById('editWatchTime').value);
-            appData.channels[idx].revenue = Number(document.getElementById('editRevenue').value);
-            appData.channels[idx].scheduledVideos = Number(document.getElementById('editScheduled').value);
-            appData.channels[idx].lastScheduledDate = document.getElementById('editLastDate').value || '-';
-            simpanKeLokal();
-            tutupModal('editModal');
-            alert('Data analitik berhasil diperbarui sesuai Studio!');
-        }
-    }
-
-    function hapusChannel(index) {
-        if(confirm('Hapus channel ini?')) {
-            appData.channels.splice(index, 1);
-            simpanKeLokal();
-        }
-    }
-
-    async function syncDataOAuth() {
-        let token = localStorage.getItem('google_access_token');
-        if(!token) return handleAuthClick();
-        if(appData.channels.length === 0) return;
-
-        logDebug('Menarik data publik (Subscribers & Video Publik) dari YouTube...');
-
-        for(let c of appData.channels) {
-            try {
-                const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${c.id}`, {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                const data = await res.json();
-                if(data.items && data.items.length > 0) {
-                    let info = data.items[0];
-                    c.name = info.snippet.title;
-                    c.subs = Number(info.statistics.subscriberCount || 0);
-                    c.uploadedVideos = Number(info.statistics.videoCount || 0);
-                    logDebug(`Berhasil update info publik: ${c.name} (${c.subs} subs)`);
-                }
-            } catch(e) {
-                logDebug('Error fetch: ' + e.message);
-            }
-        }
-        simpanKeLokal();
-        logDebug('Sinkronisasi data publik selesai.');
-    }
-</script>
-
-</body>
-</html>
+        localStorage.setItem('rolana_oauth_channels_v7',
