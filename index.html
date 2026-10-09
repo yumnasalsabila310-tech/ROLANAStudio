@@ -98,7 +98,7 @@
                         </tr>
                     </thead>
                     <tbody id="tableBody">
-                        <tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel (Publik)".</td></tr>
+                        <tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Memuat channel...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -121,11 +121,11 @@
         </div>
     </div>
 
-    <!-- MODAL EDIT DATA PRIVAT (Jadwal & Jam Tayang) -->
+    <!-- MODAL EDIT DATA PRIVAT -->
     <div id="editModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-top:0; color:var(--primary);">Edit Data Privat (Studio)</h3>
-            <p style="font-size:12px; color:var(--text-muted);">Subscribers & Views ditarik otomatis dari luar.</p>
+            <p style="font-size:12px; color:var(--text-muted);">Subscribers & Views ditarik otomatis dari YouTube.</p>
             <input type="hidden" id="editIndex" value="-1">
 
             <label style="font-size:12px; color:var(--text-muted);">Jam Tayang (Akurat Studio):</label>
@@ -145,9 +145,8 @@
     </div>
 
 <script>
-    // Menggunakan API Key publik YouTube standar untuk membaca data publik tanpa login
-    // Anda bisa mengganti key ini dengan API key Google Cloud Anda sendiri jika diperlukan
-    const API_KEY = 'YOUR_YOUTUBE_API_KEY'; 
+    // Menggunakan CLIENT_ID yang sama sebagai referensi kredensial API Anda
+    const CLIENT_ID = '264092169137-i3acus3fkrccvbk5dp2dkvk9ekmf89j9.apps.googleusercontent.com';
 
     let appData = { channels: [] };
 
@@ -165,11 +164,10 @@
     };
 
     function muatDataLokal() {
-        let saved = localStorage.getItem('rolana_public_channels_v1');
+        let saved = localStorage.getItem('rolana_public_channels_v2');
         if(saved) {
             appData.channels = JSON.parse(saved);
         } else {
-            // Default channel Anda
             appData.channels = [{
                 id: 'UCkK0bP_g4l-bYt0wdEOXRmQ',
                 name: 'PERSIAN DEEP HOUSE',
@@ -186,7 +184,7 @@
     }
 
     function simpanKeLokal() {
-        localStorage.setItem('rolana_public_channels_v1', JSON.stringify(appData.channels));
+        localStorage.setItem('rolana_public_channels_v2', JSON.stringify(appData.channels));
         renderTable();
         updateStatsSummary();
     }
@@ -263,7 +261,6 @@
 
         try {
             logDebug('Mencari channel dari luar...');
-            // Menggunakan YouTube Data API publik (membutuhkan API Key Google Cloud Anda)
             const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&${queryParam}&key=${CLIENT_ID}`);
             const data = await res.json();
 
@@ -291,7 +288,7 @@
                 tutupModal('channelModal');
                 logDebug(`Berhasil menambahkan ${channelName}!`);
             } else {
-                alert('Channel tidak ditemukan. Pastikan Channel ID atau Handle benar.');
+                alert('Channel tidak ditemukan. Periksa kembali ID atau Handle yang dimasukkan.');
             }
         } catch(e) {
             logDebug('Error: ' + e.message);
@@ -301,9 +298,22 @@
 
     async function refreshSemuaChannel() {
         logDebug('Menyegarkan data publik dari YouTube...');
-        // Fitur ini otomatis memperbarui subscriber & views asli secara publik kapan saja tombol diklik
+        for(let c of appData.channels) {
+            try {
+                const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${c.id}&key=${CLIENT_ID}`);
+                const data = await res.json();
+                if(data.items && data.items.length > 0) {
+                    let info = data.items[0];
+                    c.name = info.snippet.title;
+                    c.subs = Number(info.statistics.subscriberCount || 0);
+                    c.totalViews = Number(info.statistics.viewCount || 0);
+                }
+            } catch(e) {
+                logDebug('Error refresh: ' + e.message);
+            }
+        }
         simpanKeLokal();
-        logDebug('Penyegaran selesai.');
+        logDebug('Penyegaran data publik selesai.');
     }
 
     function simpanEditManual() {
@@ -321,7 +331,7 @@
     function hapusChannel(index) {
         if(confirm('Hapus channel ini dari daftar?')) {
             appData.channels.splice(index, 1);
-            simpanKeLokal();
+            simpanKeLokan ? simpanKeLokan() : simpanKeLokal();
         }
     }
 </script>
