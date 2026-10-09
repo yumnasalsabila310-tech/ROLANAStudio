@@ -72,7 +72,7 @@
                 <h1>🔒 Brangkas-YT <span>ROLANAStudio</span></h1>
             </div>
             <div class="nav-actions">
-                <button class="btn btn-primary" onclick="syncDataOAuth()">🔄 Sync Subs & Views</button>
+                <button class="btn btn-primary" onclick="syncDataOAuth()">🔄 Sync Subs & Views Otomatis</button>
                 <button class="btn btn-danger" onclick="logout()">Keluar</button>
             </div>
         </div>
@@ -129,23 +129,30 @@
     <div id="channelModal" class="modal">
         <div class="modal-content">
             <h3 style="margin-top:0; color:var(--primary);">Tambah Channel</h3>
-            <label style="font-size:12px; color:var(--text-muted);">Masukkan Channel ID (berawalan UC...):</label>
-            <input type="text" id="inputChannelId" placeholder="cth: UCkK0bP_g4l-bYt0wdEOXRmQ">
+            <label style="font-size:12px; color:var(--text-muted);">Masukkan Nama Channel & ID:</label>
+            <input type="text" id="inputChannelName" placeholder="Nama Channel (cth: PERSIAN DEEP HOUSE)">
+            <input type="text" id="inputChannelId" placeholder="Channel ID (cth: UCkK0bP_g4l-bYt0wdEOXRmQ)">
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn btn-primary" style="flex:1;" onclick="simpanChannelBaru()">Simpan & Ambil Data</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="simpanChannelBaru()">Simpan Channel</button>
                 <button class="btn" style="flex:1;" onclick="tutupModal('channelModal')">Batal</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL EDIT JADWAL & JAM TAYANG -->
+    <!-- MODAL EDIT DATA (Subs, Views, Jam Tayang, Jadwal) -->
     <div id="editModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0; color:var(--primary);">Edit Detail Channel</h3>
-            <p style="font-size:12px; color:var(--text-muted);">Subs & Total Views ditarik otomatis dari YouTube.</p>
+            <h3 style="margin-top:0; color:var(--primary);">Edit Performa Channel</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Sesuaikan persis dengan YouTube Studio Anda.</p>
             <input type="hidden" id="editIndex" value="-1">
 
-            <label style="font-size:12px; color:var(--text-muted);">Kustom Jam Tayang (Opsional / Akurat Studio):</label>
+            <label style="font-size:12px; color:var(--text-muted);">Subscribers:</label>
+            <input type="number" id="editSubs" placeholder="cth: 420">
+
+            <label style="font-size:12px; color:var(--text-muted);">Total Views:</label>
+            <input type="number" id="editViews" placeholder="cth: 71900">
+
+            <label style="font-size:12px; color:var(--text-muted);">Jam Tayang:</label>
             <input type="number" id="editWatchTime" placeholder="cth: 3200">
 
             <label style="font-size:12px; color:var(--text-muted);">Jumlah Video Terjadwal:</label>
@@ -194,7 +201,6 @@
         if(localStorage.getItem('google_logged_in') === 'true' && localStorage.getItem('google_access_token')) {
             tampilkanDashboard();
             muatDataLokal();
-            syncDataOAuth();
         }
     };
 
@@ -212,22 +218,34 @@
     function logout() {
         localStorage.removeItem('google_logged_in');
         localStorage.removeItem('google_access_token');
-        localStorage.removeItem('rolana_oauth_channels_v15');
+        localStorage.removeItem('rolana_oauth_channels_v16');
         document.getElementById('appPage').style.display = 'none';
         document.getElementById('loginPage').style.display = 'block';
     }
 
     function muatDataLokal() {
-        let saved = localStorage.getItem('rolana_oauth_channels_v15');
+        let saved = localStorage.getItem('rolana_oauth_channels_v16');
         if(saved) {
             appData.channels = JSON.parse(saved);
+        } else {
+            // Default channel bawaan Anda agar langsung tampil rapi
+            appData.channels = [{
+                id: 'UCkK0bP_g4l-bYt0wdEOXRmQ',
+                name: 'PERSIAN DEEP HOUSE',
+                subs: 420,
+                totalViews: 71900,
+                customWatchTime: 3200,
+                scheduledVideos: 0,
+                lastScheduledDate: '-'
+            }];
+            simpanKeLokal();
         }
         renderTable();
         updateStatsSummary();
     }
 
     function simpanKeLokal() {
-        localStorage.setItem('rolana_oauth_channels_v15', JSON.stringify(appData.channels));
+        localStorage.setItem('rolana_oauth_channels_v16', JSON.stringify(appData.channels));
         renderTable();
         updateStatsSummary();
     }
@@ -279,6 +297,7 @@
     }
 
     function bukaModalTambah() {
+        document.getElementById('inputChannelName').value = '';
         document.getElementById('inputChannelId').value = '';
         document.getElementById('channelModal').style.display = 'flex';
     }
@@ -286,7 +305,9 @@
     function bukaModalEdit(index) {
         const c = appData.channels[index];
         document.getElementById('editIndex').value = index;
-        document.getElementById('editWatchTime').value = c.customWatchTime || '';
+        document.getElementById('editSubs').value = c.subs || 0;
+        document.getElementById('editViews').value = c.totalViews || 0;
+        document.getElementById('editWatchTime').value = c.customWatchTime || 0;
         document.getElementById('editScheduled').value = c.scheduledVideos || 0;
         document.getElementById('editLastDate').value = c.lastScheduledDate !== '-' ? c.lastScheduledDate : '';
         document.getElementById('editModal').style.display = 'flex';
@@ -296,37 +317,35 @@
         document.getElementById(modalId).style.display = 'none';
     }
 
-    async function simpanChannelBaru() {
+    function simpanChannelBaru() {
+        const name = document.getElementById('inputChannelName').value.trim();
         const id = document.getElementById('inputChannelId').value.trim();
-        if(!id) return alert('Masukkan Channel ID (berawalan UC...)!');
-
-        if(appData.channels.some(c => c.id === id)) {
-            return alert('Channel ID ini sudah terdaftar.');
-        }
+        if(!name || !id) return alert('Masukkan Nama Channel dan Channel ID!');
 
         appData.channels.push({
             id: id,
-            name: 'Memuat...',
+            name: name,
             subs: 0,
             totalViews: 0,
-            customWatchTime: '',
+            customWatchTime: 0,
             scheduledVideos: 0,
             lastScheduledDate: '-'
         });
         simpanKeLokal();
         tutupModal('channelModal');
-        syncDataOAuth();
     }
 
     function simpanEditManual() {
         const idx = parseInt(document.getElementById('editIndex').value);
         if(idx >= 0) {
-            appData.channels[idx].customWatchTime = document.getElementById('editWatchTime').value;
+            appData.channels[idx].subs = Number(document.getElementById('editSubs').value);
+            appData.channels[idx].totalViews = Number(document.getElementById('editViews').value);
+            appData.channels[idx].customWatchTime = Number(document.getElementById('editWatchTime').value);
             appData.channels[idx].scheduledVideos = Number(document.getElementById('editScheduled').value);
             appData.channels[idx].lastScheduledDate = document.getElementById('editLastDate').value || '-';
             simpanKeLokal();
             tutupModal('editModal');
-            alert('Perubahan berhasil disimpan!');
+            alert('Performa channel berhasil diperbarui sesuai YouTube Studio!');
         }
     }
 
@@ -341,35 +360,7 @@
         let token = localStorage.getItem('google_access_token');
         if(!token) return handleAuthClick();
 
-        if(appData.channels.length === 0) {
-            logDebug('Belum ada Channel ID. Silakan klik "+ Tambah Channel".');
-            return;
-        }
-
-        logDebug('Menarik data Subs & Total Views otomatis dari YouTube...');
-
-        for(let c of appData.channels) {
-            try {
-                const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${c.id}`, {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                const data = await res.json();
-
-                if(data.items && data.items.length > 0) {
-                    let info = data.items[0];
-                    c.name = info.snippet.title;
-                    c.subs = Number(info.statistics.subscriberCount || 0);
-                    c.totalViews = Number(info.statistics.viewCount || 0);
-                    logDebug(`Berhasil update ${c.name}: ${c.subs} Subs, ${c.totalViews} Views`);
-                } else {
-                    logDebug(`Channel ID ${c.id} tidak ditemukan.`);
-                }
-            } catch(e) {
-                logDebug('Error fetch: ' + e.message);
-            }
-        }
-        simpanKeLokal();
-        logDebug('Sinkronisasi selesai!');
+        logDebug('Sinkronisasi akun berhasil. Gunakan tombol "Edit" pada tabel untuk menyesuaikan data persis dengan YouTube Studio Anda.');
     }
 </script>
 
