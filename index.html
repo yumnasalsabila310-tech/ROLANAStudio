@@ -81,7 +81,7 @@
         <div class="content-box">
             <div class="table-toolbar">
                 <h3 style="margin:0;">Daftar Channel Pantauan</h3>
-                <button class="btn btn-primary" onclick="bukaModalTambah()">+ Tambah Channel (Publik)</button>
+                <button class="btn btn-primary" onclick="bukaModalTambah()">+ Tambah Channel</button>
             </div>
             <div style="overflow-x: auto;">
                 <table>
@@ -103,19 +103,18 @@
                 </table>
             </div>
 
-            <div id="debugLog" class="debug-box">System Log: Siap melacak channel dari luar...</div>
+            <div id="debugLog" class="debug-box">System Log: Siap melacak channel...</div>
         </div>
     </div>
 
-    <!-- MODAL TAMBAH CHANNEL PUBLIK -->
+    <!-- MODAL TAMBAH CHANNEL -->
     <div id="channelModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0; color:var(--primary);">Pantau Channel Publik</h3>
-            <p style="font-size:12px; color:var(--text-muted);">Masukkan Channel ID (awalan UC...) atau Handle YouTube.</p>
-            <label style="font-size:12px; color:var(--text-muted);">Channel ID atau Handle:</label>
-            <input type="text" id="inputChannelId" placeholder="cth: UCkK0bP_g4l-bYt0wdEOXRmQ atau @PersianDeepHouse">
+            <h3 style="margin-top:0; color:var(--primary);">Tambah Channel YouTube</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Tempel Link Channel, Handle (@...), atau ID (UC...).</p>
+            <input type="text" id="inputChannelId" placeholder="cth: https://www.youtube.com/channel/UCkK0bP_g4l-bYt0wdEOXRmQ">
             <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn btn-primary" style="flex:1;" onclick="tambahChannelPublik()">Pantau Channel</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="tambahChannelPublik()">Simpan & Ambil Data</button>
                 <button class="btn" style="flex:1;" onclick="tutupModal('channelModal')">Batal</button>
             </div>
         </div>
@@ -124,11 +123,10 @@
     <!-- MODAL EDIT DATA PRIVAT -->
     <div id="editModal" class="modal">
         <div class="modal-content">
-            <h3 style="margin-top:0; color:var(--primary);">Edit Data Privat (Studio)</h3>
-            <p style="font-size:12px; color:var(--text-muted);">Subscribers & Views ditarik otomatis dari YouTube.</p>
+            <h3 style="margin-top:0; color:var(--primary);">Edit Data Studio</h3>
             <input type="hidden" id="editIndex" value="-1">
 
-            <label style="font-size:12px; color:var(--text-muted);">Jam Tayang (Akurat Studio):</label>
+            <label style="font-size:12px; color:var(--text-muted);">Jam Tayang:</label>
             <input type="number" id="editWatchTime" placeholder="cth: 3200">
 
             <label style="font-size:12px; color:var(--text-muted);">Jumlah Video Terjadwal:</label>
@@ -145,7 +143,6 @@
     </div>
 
 <script>
-    // Menggunakan CLIENT_ID yang sama sebagai referensi kredensial API Anda
     const CLIENT_ID = '264092169137-i3acus3fkrccvbk5dp2dkvk9ekmf89j9.apps.googleusercontent.com';
 
     let appData = { channels: [] };
@@ -164,10 +161,11 @@
     };
 
     function muatDataLokal() {
-        let saved = localStorage.getItem('rolana_public_channels_v2');
+        let saved = localStorage.getItem('rolana_public_channels_v3');
         if(saved) {
             appData.channels = JSON.parse(saved);
         } else {
+            // Default channel PERSIAN DEEP HOUSE Anda dengan ID yang valid
             appData.channels = [{
                 id: 'UCkK0bP_g4l-bYt0wdEOXRmQ',
                 name: 'PERSIAN DEEP HOUSE',
@@ -184,7 +182,7 @@
     }
 
     function simpanKeLokal() {
-        localStorage.setItem('rolana_public_channels_v2', JSON.stringify(appData.channels));
+        localStorage.setItem('rolana_public_channels_v3', JSON.stringify(appData.channels));
         renderTable();
         updateStatsSummary();
     }
@@ -210,7 +208,7 @@
         tbody.innerHTML = '';
 
         if(appData.channels.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Belum ada channel dipantau. Klik "+ Tambah Channel (Publik)".</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Belum ada channel. Klik "+ Tambah Channel".</td></tr>`;
             return;
         }
 
@@ -255,12 +253,23 @@
 
     async function tambahChannelPublik() {
         let input = document.getElementById('inputChannelId').value.trim();
-        if(!input) return alert('Masukkan Channel ID atau Handle!');
+        if(!input) return alert('Masukkan link, handle, atau ID channel!');
 
-        let queryParam = input.startsWith('UC') ? `id=${input}` : `forHandle=${input.replace('@','')}`;
+        let queryParam = '';
+        if (input.includes('channel/')) {
+            let extractedId = input.split('channel/')[1].split('/')[0];
+            queryParam = `id=${extractedId}`;
+        } else if (input.startsWith('UC')) {
+            queryParam = `id=${input}`;
+        } else if (input.includes('@') || input.startsWith('@')) {
+            let handle = input.includes('@') ? '@' + input.split('@')[1].split('/')[0] : input;
+            queryParam = `forHandle=${handle.replace('@','')}`;
+        } else {
+            queryParam = `forHandle=${input.replace('@','')}`;
+        }
 
         try {
-            logDebug('Mencari channel dari luar...');
+            logDebug('Mencari channel...');
             const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&${queryParam}&key=${CLIENT_ID}`);
             const data = await res.json();
 
@@ -272,7 +281,7 @@
                 let views = Number(info.statistics.viewCount || 0);
 
                 if(appData.channels.some(c => c.id === channelId)) {
-                    return alert('Channel ini sudah ada di daftar.');
+                    return alert('Channel ini sudah terdaftar.');
                 }
 
                 appData.channels.push({
@@ -286,13 +295,13 @@
                 });
                 simpanKeLokal();
                 tutupModal('channelModal');
-                logDebug(`Berhasil menambahkan ${channelName}!`);
+                logDebug(`Berhasil memuat ${channelName}!`);
             } else {
-                alert('Channel tidak ditemukan. Periksa kembali ID atau Handle yang dimasukkan.');
+                alert('Channel tidak ditemukan. Pastikan link atau ID channel benar.');
             }
         } catch(e) {
             logDebug('Error: ' + e.message);
-            alert('Gagal mengambil data publik channel.');
+            alert('Gagal mengambil data channel.');
         }
     }
 
@@ -313,7 +322,7 @@
             }
         }
         simpanKeLokal();
-        logDebug('Penyegaran data publik selesai.');
+        logDebug('Penyegaran data selesai!');
     }
 
     function simpanEditManual() {
@@ -324,14 +333,14 @@
             appData.channels[idx].lastScheduledDate = document.getElementById('editLastDate').value || '-';
             simpanKeLokal();
             tutupModal('editModal');
-            alert('Data privat berhasil diperbarui!');
+            alert('Perubahan berhasil disimpan!');
         }
     }
 
     function hapusChannel(index) {
-        if(confirm('Hapus channel ini dari daftar?')) {
+        if(confirm('Hapus channel ini?')) {
             appData.channels.splice(index, 1);
-            simpanKeLokan ? simpanKeLokan() : simpanKeLokal();
+            simpanKeLokal();
         }
     }
 </script>
